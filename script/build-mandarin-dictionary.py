@@ -15,8 +15,8 @@ CEDICT_URL = (
 SOURCE_LABEL = "CC-CEDICT snapshot mirrored by cschiller/zhongwen, commit e6b46b6 (2026-09-27)"
 
 ENTRY_RE = re.compile(
-    r"^(?P<trad>\\S+)\\s+(?P<simp>\\S+)\\s+"
-    r"(?:\\[\\[(?P<v2>[^]]+)\\]\\]|\\[(?P<v1>[^]]+)\\])\\s+/"
+    r"^(?P<trad>\S+)\s+(?P<simp>\S+)\s+"
+    r"(?:\[\[(?P<v2>[^]]+)\]\]|\[(?P<v1>[^]]+)\])\s+/"
 )
 TONE_RE = re.compile(r"[1-5]")
 BOUNDARY_RE = re.compile(r"([1-5])(?=[A-Za-züÜ])")
@@ -26,15 +26,15 @@ CANTONESE_PREFIXES = ("jyut6ping3", "loengfan")
 
 def contains_cjk(text: str) -> bool:
     return any(
-        "\\u3400" <= ch <= "\\u9fff"
-        or "\\U00020000" <= ch <= "\\U0003134f"
+        "\u3400" <= ch <= "\u9fff"
+        or "\U00020000" <= ch <= "\U0003134f"
         for ch in text
     )
 
 
 def normalize_pinyin(raw: str) -> str:
     # V1 has spaces between syllables; V2 commonly joins syllables inside [[...]].
-    raw = BOUNDARY_RE.sub(r"\\1 ", raw)
+    raw = BOUNDARY_RE.sub(r"\1 ", raw)
     raw = raw.replace("u:", "v").replace("U:", "v").replace("ü", "v").replace("Ü", "v")
     raw = TONE_RE.sub("", raw).lower()
     raw = NON_PINYIN_RE.sub(" ", raw)
@@ -112,8 +112,8 @@ def main() -> None:
         "...",
         "",
     ]
-    dictionary.extend(f"{word}\\t{code}" for word, code in entries)
-    (rime_dir / "luna_pinyin.dict.yaml").write_text("\\n".join(dictionary) + "\\n", encoding="utf-8")
+    dictionary.extend(f"{word}\t{code}" for word, code in entries)
+    (rime_dir / "luna_pinyin.dict.yaml").write_text("\n".join(dictionary) + "\n", encoding="utf-8")
 
     (rime_dir / "default.custom.yaml").write_text(
         """# TypeDuck Mandarin: expose only Traditional Mandarin Pinyin
