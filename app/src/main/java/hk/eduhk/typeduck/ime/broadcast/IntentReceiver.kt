@@ -21,6 +21,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Build
 import hk.eduhk.typeduck.core.Rime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,9 +51,16 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
     }
 
     fun registerReceiver(context: Context) {
-        context.registerReceiver(this, IntentFilter(COMMAND_DEPLOY))
-        context.registerReceiver(this, IntentFilter(COMMAND_SYNC))
-        context.registerReceiver(this, IntentFilter(Intent.ACTION_SHUTDOWN))
+        val filter = IntentFilter().apply {
+            addAction(COMMAND_DEPLOY)
+            addAction(COMMAND_SYNC)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(this, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            context.registerReceiver(this, filter)
+        }
     }
 
     fun unregisterReceiver(context: Context) {
