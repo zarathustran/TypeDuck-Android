@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Generate the Traditional Mandarin Rime dictionary used by TypeDuck Mandarin."""
+"""Generate Traditional Mandarin Rime dictionaries for TypeDuck Mandarin."""
 
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 import re
 import urllib.request
 from pathlib import Path
@@ -16,11 +18,11 @@ SOURCE_LABEL = "CC-CEDICT snapshot mirrored by cschiller/zhongwen, commit e6b46b
 
 ENTRY_RE = re.compile(
     r"^(?P<trad>\S+)\s+(?P<simp>\S+)\s+"
-    r"(?:\[\[(?P<v2>[^]]+)\]\]|\[(?P<v1>[^]]+)\])\s+/"
+    r"(?:\[\[(?P<v2>[^]]+)\]\]|\[(?P<v1>[^]]+)\])\s+/(?P<defs>.*)/$"
 )
 TONE_RE = re.compile(r"[1-5]")
 BOUNDARY_RE = re.compile(r"([1-5])(?=[A-Za-züÜ])")
-NON_PINYIN_RE = re.compile(r"[^a-zv]+")
+NON_PINYIN_WITH_TONES_RE = re.compile(r"[^a-zv1-5]+")
 CANTONESE_PREFIXES = ("jyut6ping3", "loengfan")
 
 
@@ -32,18 +34,36 @@ def contains_cjk(text: str) -> bool:
     )
 
 
-def normalize_pinyin(raw: str) -> str:
-    # V1 has spaces between syllables; V2 commonly joins syllables inside [[...]].
+def normalize_tone_pinyin(raw: str) -> str:
+    # CC-CEDICT V1 uses spaces between syllables; V2 may join numbered syllables.
     raw = BOUNDARY_RE.sub(r"\1 ", raw)
     raw = raw.replace("u:", "v").replace("U:", "v").replace("ü", "v").replace("Ü", "v")
-    raw = TONE_RE.sub("", raw).lower()
-    raw = NON_PINYIN_RE.sub(" ", raw)
+    raw = raw.lower()
+    raw = NON_PINYIN_WITH_TONES_RE.sub(" ", raw)
     return " ".join(raw.split())
 
 
-def parse_entries(text: str) -> list[tuple[str, str]]:
+def input_pinyin(tone_pinyin: str) -> str:
+    return " ".join(TONE_RE.sub("", tone_pinyin).split())
+
+
+def clean_definition(raw: str) -> str:
+    senses = []
+    for sense in raw.split("/"):
+        sense = " ".join(sense.replace("\t", " ").replace("\r", " ").replace("\n", " ").split())
+        if not sense:
+            continue
+        # Keep the candidate strip useful instead of dumping the entire dictionary article.
+        senses.append(sense)
+        if len(senses) == 3:
+            break
+    definition = "; ".join(senses)
+    return definition[:240]
+
+
+def parse_entries(text: str) -> list[tuple[str, str, str, str]]:
     seen: set[tuple[str, str]] = set()
-    entries: list[tuple[str, str]] = []
+    entries: list[tuple[str, str, str, str]] = []
     for line in text.splitlines():
         if not line or line.startswith("#"):
             continue
@@ -53,14 +73,47 @@ def parse_entries(text: str) -> list[tuple[str, str]]:
         traditional = match.group("trad")
         if not contains_cjk(traditional):
             continue
-        pinyin = normalize_pinyin(match.group("v2") or match.group("v1") or "")
-        if not pinyin:
+        tone_pinyin = normalize_tone_pinyin(match.group("v2") or match.group("v1") or "")
+        plain_pinyin = input_pinyin(tone_pinyin)
+        if not plain_pinyin:
             continue
-        item = (traditional, pinyin)
-        if item not in seen:
-            seen.add(item)
-            entries.append(item)
+        key = (traditional, plain_pinyin)
+        if key in seen:
+            continue
+        seen.add(key)
+        entries.append(
+            (
+                traditional,
+                plain_pinyin,
+                tone_pinyin,
+                clean_definition(match.group("defs")),
+            )
+        )
     return entries
+
+
+def csv_row(fields: list[str]) -> str:
+    output = io.StringIO()
+    writer = csv.writer(output, lineterminator="")
+    writer.writerow(fields)
+    return output.getvalue()
+
+
+def build_lookup_row(
+    traditional: str,
+    plain_pinyin: str,
+    tone_pinyin: str,
+    definition: str,
+) -> str:
+    # The TypeDuck rime-dictionary-lookup-filter consumes a 21-column row.
+    # It matches column 0 against the candidate pronunciation, displays column 2,
+    # and maps column 16 to CandidateEntry.properties.definition.eng.
+    fields = [""] * 21
+    fields[0] = plain_pinyin.replace(" ", "")
+    fields[2] = tone_pinyin.replace(" ", "")
+    fields[7] = "1"
+    fields[16] = definition
+    return f"{csv_row(fields)}\t{traditional}"
 
 
 def download_cedict() -> str:
@@ -112,8 +165,59 @@ def main() -> None:
         "...",
         "",
     ]
-    dictionary.extend(f"{word}\t{code}" for word, code in entries)
+    dictionary.extend(f"{word}\t{code}" for word, code, _, _ in entries)
     (rime_dir / "luna_pinyin.dict.yaml").write_text("\n".join(dictionary) + "\n", encoding="utf-8")
+
+    lookup_dictionary = [
+        "# TypeDuck English-gloss lookup dictionary generated from CC-CEDICT",
+        "# encoding: utf-8",
+        "---",
+        "name: mandarin_cedict_lookup",
+        'version: "2026.09.27-cedict"',
+        "sort: original",
+        "use_preset_vocabulary: false",
+        "...",
+        "",
+    ]
+    lookup_dictionary.extend(
+        build_lookup_row(word, code, tone_pinyin, definition)
+        for word, code, tone_pinyin, definition in entries
+        if definition
+    )
+    (rime_dir / "mandarin_cedict_lookup.dict.yaml").write_text(
+        "\n".join(lookup_dictionary) + "\n",
+        encoding="utf-8",
+    )
+
+    (rime_dir / "mandarin_cedict_lookup.schema.yaml").write_text(
+        """# Rime schema used only to compile TypeDuck's English-gloss lookup dictionary
+schema:
+  schema_id: mandarin_cedict_lookup
+  name: Mandarin CEDICT Lookup
+  version: "2026.09.27"
+
+switches:
+  - name: ascii_mode
+    reset: 0
+    states: [ 中文, 英文 ]
+
+engine:
+  processors:
+    - ascii_composer
+  segmentors:
+    - ascii_segmentor
+  translators:
+    - table_translator
+
+speller:
+  alphabet: zyxwvutsrqponmlkjihgfedcba
+  delimiter: " '"
+
+translator:
+  dictionary: mandarin_cedict_lookup
+""",
+        encoding="utf-8",
+    )
 
     (rime_dir / "default.custom.yaml").write_text(
         """# TypeDuck Mandarin: expose only Traditional Mandarin Pinyin
@@ -131,11 +235,19 @@ patch:
         [("  - schema: jyut6ping3", "  - schema: luna_pinyin")],
     )
     patch_file(
+        rime_dir / "template.yaml",
+        [("  dictionary: jyut6ping3_scolar", "  dictionary: mandarin_cedict_lookup")],
+    )
+    patch_file(
         rime_dir / "luna_pinyin.schema.yaml",
         [
-            ("  name: 普通話", "  name: 國語拼音（繁體）"),
+            (
+                "  name: 普通話\n  author:",
+                "  name: 國語拼音（繁體）\n  dependencies:\n    - mandarin_cedict_lookup\n  author:",
+            ),
             ("  enable_sentence: false", "  enable_sentence: true"),
             ("  enable_user_dict: false", "  enable_user_dict: true"),
+            (r"    - xform/^/\v/", r"    - xform/^/\f/"),
         ],
     )
     patch_file(
@@ -147,7 +259,11 @@ patch:
         if path.is_file() and path.name.startswith(CANTONESE_PREFIXES):
             path.unlink()
 
-    print(f"Generated {len(entries)} Traditional Mandarin entries from {SOURCE_LABEL}")
+    gloss_count = sum(1 for _, _, _, definition in entries if definition)
+    print(
+        f"Generated {len(entries)} Traditional Mandarin entries and "
+        f"{gloss_count} English-gloss rows from {SOURCE_LABEL}"
+    )
 
 
 if __name__ == "__main__":
