@@ -24,6 +24,7 @@ import hk.eduhk.typeduck.data.AppPrefs;
 import hk.eduhk.typeduck.data.DataManager;
 import hk.eduhk.typeduck.data.opencc.OpenCCDictManager;
 import hk.eduhk.typeduck.data.schema.SchemaManager;
+import java.io.File;
 import java.util.Map;
 import kotlin.Pair;
 import kotlinx.coroutines.channels.BufferOverflow;
@@ -216,12 +217,17 @@ public class Rime {
   private static void init(boolean full_check) {
     isHandlingRimeNotification = false;
 
-    DataManager.sync();
+    final boolean assetsChanged = DataManager.sync();
     final String sharedDataDir = getAppPrefs().getProfile().getSharedDataDir();
     final String userDataDir = getAppPrefs().getProfile().getUserDataDir();
+    final boolean compiledSchemaMissing =
+        !new File(DataManager.getBuildDir(), "luna_pinyin.schema.yaml").isFile();
+    final boolean requireFullDeploy = full_check || assetsChanged || compiledSchemaMissing;
 
-    Timber.i("Starting up Rime APIs ...");
-    startupRime(sharedDataDir, userDataDir, full_check);
+    Timber.i(
+        "Starting up Rime APIs (fullDeploy=%s, assetsChanged=%s, compiledSchemaMissing=%s) ...",
+        requireFullDeploy, assetsChanged, compiledSchemaMissing);
+    startupRime(sharedDataDir, userDataDir, requireFullDeploy);
 
     Timber.i("Initializing schema stuffs ...");
     initSchema();
