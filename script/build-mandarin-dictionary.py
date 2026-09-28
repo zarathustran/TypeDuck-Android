@@ -173,7 +173,7 @@ def main() -> None:
         "",
         "---",
         "name: luna_pinyin",
-        'version: "2026.09.27-cedict"',
+        'version: "2026.09.27-cedict-r2"',
         "sort: by_weight",
         "...",
         "",
@@ -186,7 +186,7 @@ def main() -> None:
         "# encoding: utf-8",
         "---",
         "name: mandarin_cedict_lookup",
-        'version: "2026.09.27-cedict"',
+        'version: "2026.09.27-cedict-r2"',
         "sort: original",
         "use_preset_vocabulary: false",
         "...",
@@ -207,7 +207,7 @@ def main() -> None:
 schema:
   schema_id: mandarin_cedict_lookup
   name: Mandarin CEDICT Lookup
-  version: "2026.09.27"
+  version: "2026.09.27-r2"
 
 switches:
   - name: ascii_mode
