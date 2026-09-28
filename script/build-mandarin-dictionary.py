@@ -105,15 +105,28 @@ def build_lookup_row(
     tone_pinyin: str,
     definition: str,
 ) -> str:
-    # The TypeDuck rime-dictionary-lookup-filter consumes a 21-column row.
-    # It matches column 0 against the candidate pronunciation, displays column 2,
-    # and maps column 16 to CandidateEntry.properties.definition.eng.
-    fields = [""] * 21
+    # The native rime-dictionary-lookup-filter prepends matchInputBuffer and
+    # honzi before handing this CSV to CandidateEntry. Therefore these fields
+    # begin at CandidateEntry.jyutping:
+    #   0 pronunciation, 1 pronOrder, 2 sandhi, 3 litColReading,
+    #   4 partOfSpeech, 5 register, 6 label, 7 normalized, 8 written,
+    #   9 vernacular, 10 collocation, 11 English, 12 Urdu, 13 Nepali,
+    #   14 Hindi, 15 Indonesian.
+    #
+    # The native filter calls std::stoi() on field 1, so it must always contain
+    # a valid integer. Leaving it blank crashes the IME process when candidates
+    # are looked up.
+    fields = [""] * 16
     fields[0] = plain_pinyin.replace(" ", "")
-    fields[2] = tone_pinyin.replace(" ", "")
-    fields[7] = "1"
-    fields[16] = definition
-    return f"{csv_row(fields)}\t{traditional}"
+    fields[1] = "1"
+    fields[2] = "0"
+    fields[11] = definition
+
+    row = csv_row(fields)
+    parsed = next(csv.reader([row]))
+    if len(parsed) != len(fields) or not parsed[1].isdigit():
+        raise RuntimeError("Generated an invalid TypeDuck lookup row")
+    return f"{row}\t{traditional}"
 
 
 def download_cedict() -> str:
