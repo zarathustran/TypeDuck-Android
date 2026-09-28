@@ -39,22 +39,31 @@ object DataManager {
         }
     }
 
-    @JvmStatic
-    fun sync() {
-        val newHash = Const.buildGitHash
-        val oldHash = prefs.internal.lastBuildGitHash
+    private val assetsBuildHash = File(sharedDataDir, ".typeduck-assets-git-hash")
 
-        diff(oldHash, newHash).run {
-            Timber.d("Diff: $this")
-            when (this) {
-                is Diff.New -> ResourceUtils.copyFileFromAssets(
-                    "rime", sharedDataDir.absolutePath
-                )
-                is Diff.Update -> ResourceUtils.copyFileFromAssets(
-                    "rime", sharedDataDir.absolutePath
-                )
-                is Diff.Keep -> {}
+    @JvmStatic
+    fun sync(): Boolean {
+        val newHash = Const.buildGitHash
+        val oldHash = runCatching {
+            if (assetsBuildHash.isFile) assetsBuildHash.readText().trim() else ""
+        }.getOrDefault("")
+        val changed = oldHash != newHash
+
+        Timber.d("Rime assets changed=%s (old=%s, new=%s)", changed, oldHash, newHash)
+        if (changed) {
+            sharedDataDir.mkdirs()
+            ResourceUtils.copyFileFromAssets("rime", sharedDataDir.absolutePath)
+
+            // TypeDuck's custom RimeStartQuick() deliberately skips workspace_update.
+            // Without clearing generated build files, an APK update can keep executing a
+            // stale compiled dictionary even after corrected source YAML is copied.
+            if (buildDir.exists()) {
+                Timber.i("Clearing stale compiled Rime build cache after app update")
+                buildDir.deleteRecursively()
             }
+
+            assetsBuildHash.parentFile?.mkdirs()
+            assetsBuildHash.writeText(newHash)
         }
 
         // FIXME：缺失 default.custom.yaml 会导致方案列表为空
@@ -74,5 +83,6 @@ object DataManager {
         )
 
         Timber.i("Synced!")
+        return changed
     }
 }
