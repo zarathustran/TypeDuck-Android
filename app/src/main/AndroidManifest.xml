@@ -14,7 +14,7 @@
         android:theme="@style/theme">
         <service
             android:name=".TypeDuckIMEService"
-            android:exported="false"
+            android:exported="true"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_INPUT_METHOD">
             <intent-filter>
