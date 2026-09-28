@@ -27,7 +27,7 @@ class AboutPreference(context: Context, attrs: AttributeSet?) : Preference(conte
 	}
 
 	internal class EmailLinkTransformationMethod : TransformationMethod {
-		private val subject = "TypeDuck Enquiry / Issue Report | 打得粵語輸入法查詢／問題匯報"
+		private val subject = "TypeDuck Mandarin Issue Report | 國語拼音輸入法問題回報"
 		private val body = """
 			|
 			|

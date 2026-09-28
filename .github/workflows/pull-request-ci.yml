@@ -1,63 +1,74 @@
 name: pull request ci
 on: [pull_request]
+
 env:
   CI_NAME: Pull Request CI
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout last commit
-        uses: actions/checkout@v3
+      - name: Checkout source
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Get branch name
-        id: vars
         run: |
           echo ${GITHUB_REF#refs/*/}
-          echo CI_BRANCH=${GITHUB_REF#refs/*/} >> $GITHUB_ENV
+          echo CI_BRANCH=${GITHUB_REF#refs/*/} >> "$GITHUB_ENV"
+
+      - name: Checkout Rime schema assets
+        run: git submodule update --init app/src/main/assets/rime
+
+      - name: Generate Traditional Mandarin dictionary
+        run: python3 script/build-mandarin-dictionary.py
 
       - name: Calculate JNI cache hash
         id: cache-hash
         run: script/cache-hash.sh
 
       - name: Fetch JNI cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         id: jni-cache
         with:
-          path: "app/prebuilt"
+          path: app/prebuilt
           key: jni-debug-${{ steps.cache-hash.outputs.hash }}
 
-      - name: Fetch submodules
+      - name: Fetch native submodules
         if: ${{ !steps.jni-cache.outputs.cache-hit }}
-        run: |
-          git submodule update --init --recursive
+        run: git submodule update --init --recursive app/src/main/jni/snappy app/src/main/jni/librime
 
       - name: Setup Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
+          distribution: temurin
           java-version: 17
-          # will restore cache of dependencies and wrappers
-          cache: 'gradle'
+          cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
+        uses: android-actions/setup-android@v3
 
       - name: Spotless code style check
         run: make spotless
 
-      - name: Build Trime
+      - name: Build debug APKs
         run: make debug
 
       - name: Add JNI cache
         if: ${{ !steps.jni-cache.outputs.cache-hit }}
         run: cp -R app/build/intermediates/stripped_native_libs/debug/out/lib app/prebuilt
 
-      - name: Upload Trime artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload universal APK
+        uses: actions/upload-artifact@v4
         with:
-          name: trime.zip
-          path: app/build/outputs/apk/**/*.apk
-          # keep 30 days
-          retention-days: 30
+          name: TypeDuck-Mandarin-universal
+          path: app/build/outputs/apk/**/*universal-debug.apk
+          retention-days: 90
+
+      - name: Upload ARM64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TypeDuck-Mandarin-arm64-v8a
+          path: app/build/outputs/apk/**/*arm64-v8a-debug.apk
+          retention-days: 90

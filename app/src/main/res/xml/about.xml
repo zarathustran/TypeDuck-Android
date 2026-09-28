@@ -16,10 +16,10 @@
 				android:title="@string/pref_learnduck"
 				android:summary="@string/pref_learnduck_summary"
 				app:icon="@drawable/ic_baseline_launch_24"
-				app:jumpToUrl="https://learn.typeduck.hk" />
+				app:jumpToUrl="https://github.com/zarathustran/TypeDuck-Android/blob/traditional-mandarin/MANDARIN_DICTIONARY.md" />
 		<hk.eduhk.typeduck.ui.components.IntentPreference
 				android:title="@string/pref_jyutping_site"
-				app:jumpToUrl="https://lshk.org/jyutping-scheme/"
+				app:jumpToUrl="https://dict.tw/database/cedict"
 				app:icon="@drawable/ic_baseline_launch_24" />
 		<hk.eduhk.typeduck.ui.components.IntentPreference
 				android:title="@string/pref_typeduck_source"
