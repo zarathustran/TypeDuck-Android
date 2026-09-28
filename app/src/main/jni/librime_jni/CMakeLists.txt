@@ -7,6 +7,12 @@ set(RIME_JNI_SOURCES
   rime_jni.cc
 )
 add_library(rime_jni SHARED ${RIME_JNI_SOURCES})
+# NDK r27 and lower default to 4 KB ELF segment alignment. Android 15+
+# devices may use 16 KB pages, so make the final shared object page-size agnostic.
+target_link_options(rime_jni PRIVATE
+  "-Wl,-z,max-page-size=16384"
+  "-Wl,-z,common-page-size=16384"
+)
 target_link_libraries(rime_jni rime-static log ${Opencc_LIBRARY})
 target_include_directories(rime_jni PRIVATE
   "${CMAKE_SOURCE_DIR}/librime/src"
