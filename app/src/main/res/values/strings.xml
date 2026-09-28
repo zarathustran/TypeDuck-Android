@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-	<string name="app_name">TypeDuck</string>
+	<string name="app_name">TypeDuck Mandarin</string>
 	<string name="space">Space</string>
 	<string name="fullwidth_space">Fullwidth Space</string>
 	<string name="confirm">Confirm</string>
@@ -10,21 +10,21 @@
 	<string name="onboarding_done">Done!</string>
 	<string-array name="onboarding_headings">
 		<item>
-"歡迎使用 TypeDuck
-Welcome to TypeDuck"
+"歡迎使用 TypeDuck Mandarin
+Welcome to TypeDuck Mandarin"
 		</item>
-		<item>Activating TypeDuck</item>
+		<item>Activating TypeDuck Mandarin</item>
 		<item>One More Step to Go…</item>
 		<item>You’re done!</item>
 	</string-array>
 	<string-array name="onboarding_contents">
 		<item>
-"歡迎使用 TypeDuck 打得 ⸺ 設有少數族裔語言提示粵拼輸入法！有字想打？一裝即用，毋須再等，即刻打得！
-Welcome to TypeDuck: a Cantonese input keyboard with minority language prompts! Got something you want to type? Have your fingers ready, get, set, TYPE DUCK!"
+"歡迎使用 TypeDuck Mandarin ⸺ 繁體中文國語拼音輸入法。
+Welcome to TypeDuck Mandarin: a Traditional Chinese Mandarin Pinyin keyboard."
 		</item>
-		<item>Enable TypeDuck in System Keyboard Settings</item>
-		<item>Select TypeDuck from the list of input methods to get started.</item>
-		<item>TypeDuck is now available for use. If you encounter any problems, you may visit the “About” page for support.</item>
+		<item>Enable TypeDuck Mandarin in System Keyboard Settings</item>
+		<item>Select TypeDuck Mandarin from the list of input methods to get started.</item>
+		<item>TypeDuck Mandarin is now available for use. If you encounter any problems, you may visit the “About” page for support.</item>
 	</string-array>
 	<string name="refreshing">Refreshing…</string>
 	<string name="pref_refresh">Refresh</string>
@@ -43,7 +43,7 @@ Welcome to TypeDuck: a Cantonese input keyboard with minority language prompts! 
 		<item name="nep">Nepali</item>
 		<item name="urd">Urdu</item>
 	</string-array>
-	<string name="pref_show_romanization">Romanization above candidates</string>
+	<string name="pref_show_romanization">Pinyin above candidates</string>
 	<string name="pref_show_reverse_lookup">Reverse lookup code above candidates</string>
 	<string name="pref_candidate_font_size">Font size of candidates</string>
 	<string name="pref_candidate_gap">Gap between candidates</string>
@@ -64,21 +64,18 @@ Welcome to TypeDuck: a Cantonese input keyboard with minority language prompts! 
 	<string name="pref_symbols_on_qwerty_summary">Long press on letter keys insert numbers and symbols</string>
 	<string name="pref_about">About</string>
 	<string name="pref_about_description">
-"歡迎使用 TypeDuck 打得 ⸺ 設有少數族裔語言提示粵拼輸入法！有字想打？一裝即用，毋須再等，即刻打得！
-Welcome to TypeDuck: a Cantonese input keyboard with minority language prompts! Got something you want to type? Have your fingers ready, get, set, TYPE DUCK!
+"TypeDuck Mandarin is an independent Traditional Chinese Mandarin Pinyin adaptation of the open-source TypeDuck Android keyboard.
 
-如有任何查詢，歡迎電郵至 info@typeduck.hk 或 lchaakming@eduhk.hk。
-Should you have any enquiries, please email info@typeduck.hk or lchaakming@eduhk.hk.
+The keyboard uses the Rime input method engine and a pinned CC-CEDICT-derived Traditional Chinese lexicon. Dictionary provenance and licensing are documented in MANDARIN_DICTIONARY.md in the source repository.
 
-本輸入法由香港教育大學語言學及現代語言系開發。特別鳴謝「語文教育及研究常務委員會」資助本計劃。
-This input method is developed by the Department of Linguistics and Modern Language Studies, the Education University of Hong Kong. Special thanks to the Standing Committee on Language Education and Research for funding this project."
+Upstream TypeDuck was developed by the Department of Linguistics and Modern Language Studies, The Education University of Hong Kong. This fork is not an official TypeDuck-HK release."
 	</string>
 	<string name="pref_links">Links</string>
-	<string name="pref_typeduck_site">TypeDuck Website</string>
-	<string name="pref_learnduck">LearnDuck 粵拼打字入門</string>
-	<string name="pref_learnduck_summary">Introduction to Cantonese Jyutping Typing</string>
-	<string name="pref_jyutping_site">粵拼 Jyutping</string>
-	<string name="pref_typeduck_source">TypeDuck Source Code</string>
+	<string name="pref_typeduck_site">TypeDuck Mandarin Website</string>
+	<string name="pref_learnduck">Mandarin Dictionary Notes</string>
+	<string name="pref_learnduck_summary">Dictionary provenance and licensing</string>
+	<string name="pref_jyutping_site">DICT.TW CEDICT Reference</string>
+	<string name="pref_typeduck_source">TypeDuck Mandarin Source Code</string>
 	<string name="pref_trime_source">Trime Source Code</string>
 	<string name="pref_acknowledgements">Acknowledgements</string>
 </resources>
