@@ -11,6 +11,11 @@
 			android:key="pref_refresh"
 			android:title="@string/pref_refresh"
 			app:iconSpaceReserved="false" />
+	<Preference
+			android:key="pref_export_diagnostics"
+			android:title="@string/pref_export_diagnostics"
+			android:summary="@string/pref_export_diagnostics_summary"
+			app:iconSpaceReserved="false" />
 	<hk.eduhk.typeduck.ui.components.BinarySegmentPreference
 			android:selectable="false"
 			android:key="pref_interface_language"
