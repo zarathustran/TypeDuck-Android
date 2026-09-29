@@ -933,6 +933,9 @@ public class Trime extends LifecycleInputMethodService {
           DraftHelper.INSTANCE.onInputEventChanged();
         }
     }
+
+    // Re-evaluate temporary Shift after the editor type and privacy mode are known.
+    dispatchCapsStateToInputView();
   }
 
   @Override
@@ -976,11 +979,50 @@ public class Trime extends LifecycleInputMethodService {
    * a sentence.
    */
   private void dispatchCapsStateToInputView() {
-    if (!imeReady) return;
-    if ((isAutoCaps && Rime.isAsciiMode())
-        && (mainKeyboardView != null && !mainKeyboardView.isCapsOn())) {
-      mainKeyboardView.setShifted(false, activeEditorInstance.getCursorCapsMode() != 0);
+    if (!imeReady || mainKeyboardView == null || mainKeyboardView.isCapsOn()) return;
+    mainKeyboardView.setShifted(
+        false, isAutoCaps && Rime.isAsciiMode() && shouldAutoCapEnglishSentence());
+  }
+
+  /**
+   * Android's cursor caps mode is the preferred signal, but a surprising number of editors do not
+   * set the sentence-capitalization flag. Fall back to inspecting nearby text so English mode still
+   * behaves like a modern phone keyboard at the start of a field or after sentence punctuation.
+   */
+  private boolean shouldAutoCapEnglishSentence() {
+    if (activeEditorInstance == null) return false;
+    if (activeEditorInstance.getCursorCapsMode() != 0) return true;
+
+    final EditorInfo info = editorInfo != null ? editorInfo : getCurrentInputEditorInfo();
+    if (info == null) return false;
+
+    final int inputType = info.inputType;
+    if ((inputType & InputType.TYPE_MASK_CLASS) != InputType.TYPE_CLASS_TEXT) return false;
+
+    final int variation = inputType & InputType.TYPE_MASK_VARIATION;
+    switch (variation) {
+      case InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS:
+      case InputType.TYPE_TEXT_VARIATION_PASSWORD:
+      case InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD:
+      case InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS:
+      case InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD:
+      case InputType.TYPE_TEXT_VARIATION_URI:
+        return false;
+      default:
+        break;
     }
+
+    final String beforeCursor = activeEditorInstance.getTextBeforeCursor(64);
+    if (beforeCursor.isEmpty()) return true;
+
+    for (int i = beforeCursor.length() - 1; i >= 0; --i) {
+      final char c = beforeCursor.charAt(i);
+      if (c == '\n' || c == '\r') return true;
+      if (Character.isWhitespace(c)) continue;
+      if ("\"'’”»)]}".indexOf(c) >= 0) continue;
+      return ".!?。！？".indexOf(c) >= 0;
+    }
+    return true;
   }
 
   private boolean isComposing() {
@@ -989,6 +1031,7 @@ public class Trime extends LifecycleInputMethodService {
 
   public void commitText(String text) {
     activeEditorInstance.commitText(text, true);
+    imeInitializationHandler.post(this::dispatchCapsStateToInputView);
   }
 
   public void commitTextByChar(String text) {
@@ -1017,6 +1060,7 @@ public class Trime extends LifecycleInputMethodService {
     // todo 改为异步处理按键事件、刷新UI
     final boolean ret = Rime.processKey(event[0], event[1]);
     activeEditorInstance.commitRimeText();
+    imeInitializationHandler.post(this::dispatchCapsStateToInputView);
     return ret;
   }
 

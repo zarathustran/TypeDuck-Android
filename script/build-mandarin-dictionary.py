@@ -15,6 +15,12 @@ CEDICT_URL = (
     "e6b46b6fc9a05655eefa7fb8e6b12be93e6f1618/data/cedict_ts.u8"
 )
 SOURCE_LABEL = "CC-CEDICT snapshot mirrored by cschiller/zhongwen, commit e6b46b6 (2026-09-27)"
+RIME_ICE_COMMIT = "3aea6d3694fb3d94ec663641f021f788822897ad"
+RIME_ICE_URLS = (
+    f"https://raw.githubusercontent.com/iDvel/rime-ice/{RIME_ICE_COMMIT}/cn_dicts/8105.dict.yaml",
+    f"https://raw.githubusercontent.com/iDvel/rime-ice/{RIME_ICE_COMMIT}/cn_dicts/base.dict.yaml",
+)
+RIME_ICE_SOURCE_LABEL = f"Rime-Ice frequency data, commit {RIME_ICE_COMMIT[:7]} (2026-09-25)"
 
 ENTRY_RE = re.compile(
     r"^(?P<trad>\S+)\s+(?P<simp>\S+)\s+"
@@ -23,6 +29,7 @@ ENTRY_RE = re.compile(
 TONE_RE = re.compile(r"[1-5]")
 BOUNDARY_RE = re.compile(r"([1-5])(?=[A-Za-züÜ])")
 NON_PINYIN_WITH_TONES_RE = re.compile(r"[^a-zv1-5]+")
+NON_PINYIN_RE = re.compile(r"[^a-zv]+")
 CANTONESE_PREFIXES = ("jyut6ping3", "loengfan")
 
 
@@ -66,9 +73,9 @@ def clean_definition(raw: str) -> str:
     return definition[:240]
 
 
-def parse_entries(text: str) -> list[tuple[str, str, str, str]]:
+def parse_entries(text: str) -> list[tuple[str, str, str, str, str]]:
     seen: set[tuple[str, str]] = set()
-    entries: list[tuple[str, str, str, str]] = []
+    entries: list[tuple[str, str, str, str, str]] = []
     for line in text.splitlines():
         if not line or line.startswith("#"):
             continue
@@ -76,6 +83,7 @@ def parse_entries(text: str) -> list[tuple[str, str, str, str]]:
         if not match:
             continue
         traditional = match.group("trad")
+        simplified = match.group("simp")
         if not contains_cjk(traditional):
             continue
         tone_pinyin = normalize_tone_pinyin(match.group("v2") or match.group("v1") or "")
@@ -89,6 +97,7 @@ def parse_entries(text: str) -> list[tuple[str, str, str, str]]:
         entries.append(
             (
                 traditional,
+                simplified,
                 plain_pinyin,
                 tone_pinyin,
                 clean_definition(match.group("defs")),
@@ -152,13 +161,76 @@ def build_lookup_row(
     return f"{row}\t{traditional}"
 
 
-def download_cedict() -> str:
+def download_text(url: str) -> str:
     request = urllib.request.Request(
-        CEDICT_URL,
+        url,
         headers={"User-Agent": "TypeDuck-Mandarin dictionary builder"},
     )
-    with urllib.request.urlopen(request, timeout=60) as response:
+    with urllib.request.urlopen(request, timeout=120) as response:
         return response.read().decode("utf-8")
+
+
+def download_cedict() -> str:
+    return download_text(CEDICT_URL)
+
+
+def normalize_rime_ice_pinyin(raw: str) -> str:
+    raw = raw.replace("u:", "v").replace("U:", "v").replace("ü", "v").replace("Ü", "v")
+    raw = NON_PINYIN_RE.sub(" ", raw.lower())
+    return " ".join(raw.split())
+
+
+def parse_rime_ice_weights(text: str) -> dict[tuple[str, str], int]:
+    weights: dict[tuple[str, str], int] = {}
+    in_body = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped == "...":
+            in_body = True
+            continue
+        if not in_body or not stripped or stripped.startswith("#"):
+            continue
+
+        fields = line.split("\t")
+        if len(fields) < 3:
+            continue
+        word = fields[0].strip()
+        pinyin = normalize_rime_ice_pinyin(fields[1])
+        if not word or not pinyin:
+            continue
+        try:
+            weight = max(1, int(float(fields[2].strip())))
+        except ValueError:
+            continue
+
+        key = (word, pinyin)
+        weights[key] = max(weight, weights.get(key, 0))
+    return weights
+
+
+def load_frequency_weights() -> dict[tuple[str, str], int]:
+    weights: dict[tuple[str, str], int] = {}
+    for url in RIME_ICE_URLS:
+        for key, weight in parse_rime_ice_weights(download_text(url)).items():
+            weights[key] = max(weight, weights.get(key, 0))
+    if len(weights) < 50_000:
+        raise RuntimeError(
+            f"Parsed only {len(weights)} Rime-Ice weighted entries; refusing to build weak ranking data"
+        )
+    return weights
+
+
+def entry_weight(
+    traditional: str,
+    simplified: str,
+    plain_pinyin: str,
+    frequency_weights: dict[tuple[str, str], int],
+) -> int:
+    return max(
+        frequency_weights.get((simplified, plain_pinyin), 0),
+        frequency_weights.get((traditional, plain_pinyin), 0),
+        1,
+    )
 
 
 def patch_file(path: Path, replacements: list[tuple[str, str]]) -> None:
@@ -186,22 +258,38 @@ def main() -> None:
     if len(entries) < 100_000:
         raise RuntimeError(f"Parsed only {len(entries)} entries; refusing to build an incomplete dictionary")
 
+    frequency_weights = load_frequency_weights()
+    weighted_count = sum(
+        1
+        for traditional, simplified, plain_pinyin, _, _ in entries
+        if entry_weight(traditional, simplified, plain_pinyin, frequency_weights) > 1
+    )
+    if weighted_count < 20_000:
+        raise RuntimeError(
+            f"Only {weighted_count} CEDICT entries received frequency weights; refusing weak ranking data"
+        )
+
     dictionary = [
         "# Rime dictionary",
         "# encoding: utf-8",
         "#",
         "# Generated by script/build-mandarin-dictionary.py",
         f"# Source: {SOURCE_LABEL}",
-        "# Data license: CC BY-SA 4.0 (see MANDARIN_DICTIONARY.md)",
+        f"# Ranking: {RIME_ICE_SOURCE_LABEL}",
+        "# Data licenses: CC BY-SA 4.0 + applicable Rime-Ice GPLv3 terms (see MANDARIN_DICTIONARY.md)",
         "",
         "---",
         "name: luna_pinyin",
-        'version: "2026.09.27-cedict-r3"',
+        'version: "2026.09.29-cedict-r4"',
         "sort: by_weight",
         "...",
         "",
     ]
-    dictionary.extend(f"{word}\t{code}" for word, code, _, _ in entries)
+    dictionary.extend(
+        f"{traditional}\t{plain_pinyin}\t"
+        f"{entry_weight(traditional, simplified, plain_pinyin, frequency_weights)}"
+        for traditional, simplified, plain_pinyin, _, _ in entries
+    )
     (rime_dir / "luna_pinyin.dict.yaml").write_text("\n".join(dictionary) + "\n", encoding="utf-8")
 
     lookup_dictionary = [
@@ -209,15 +297,15 @@ def main() -> None:
         "# encoding: utf-8",
         "---",
         "name: mandarin_cedict_lookup",
-        'version: "2026.09.27-cedict-r3"',
+        'version: "2026.09.29-cedict-r4"',
         "sort: original",
         "use_preset_vocabulary: false",
         "...",
         "",
     ]
     lookup_dictionary.extend(
-        build_lookup_row(word, code, tone_pinyin, definition)
-        for word, code, tone_pinyin, definition in entries
+        build_lookup_row(traditional, plain_pinyin, tone_pinyin, definition)
+        for traditional, _, plain_pinyin, tone_pinyin, definition in entries
         if definition
     )
     (rime_dir / "mandarin_cedict_lookup.dict.yaml").write_text(
@@ -230,7 +318,7 @@ def main() -> None:
 schema:
   schema_id: mandarin_cedict_lookup
   name: Mandarin CEDICT Lookup
-  version: "2026.09.27-r3"
+  version: "2026.09.29-r4"
 
 switches:
   - name: ascii_mode
@@ -283,22 +371,40 @@ patch:
             ),
             ("  enable_sentence: false", "  enable_sentence: true"),
             ("  enable_user_dict: false", "  enable_user_dict: true"),
+            (
+                "  encode_commit_history: false",
+                "  encode_commit_history: true\n"
+                "  contextual_suggestions: true\n"
+                "  enable_completion: true",
+            ),
             (r"    - xform/^/\v/", r"    - xform/^/\f/"),
         ],
     )
     patch_file(
         rime_dir / "trime.yaml",
-        [("  locale: zh_HK", "  locale: zh_TW")],
+        [
+            ("  locale: zh_HK", "  locale: zh_TW"),
+            ("  horizontal_gap: 5", "  horizontal_gap: 4"),
+            ("  keyboard_padding: 5", "  keyboard_padding: 4"),
+            ("  key_height: 44", "  key_height: 54"),
+            ("  round_corner: 16", "  round_corner: 10"),
+            ("  vertical_gap: 10", "  vertical_gap: 6"),
+        ],
     )
+    trime_path = rime_dir / "trime.yaml"
+    trime_text = trime_path.read_text(encoding="utf-8")
+    trime_text = trime_text.replace("    height: 44", "    height: 54")
+    trime_path.write_text(trime_text, encoding="utf-8")
 
     for path in rime_dir.iterdir():
         if path.is_file() and path.name.startswith(CANTONESE_PREFIXES):
             path.unlink()
 
-    gloss_count = sum(1 for _, _, _, definition in entries if definition)
+    gloss_count = sum(1 for _, _, _, _, definition in entries if definition)
     print(
         f"Generated {len(entries)} Traditional Mandarin entries and "
-        f"{gloss_count} English-gloss rows from {SOURCE_LABEL}"
+        f"{gloss_count} English-gloss rows from {SOURCE_LABEL}; "
+        f"frequency-ranked {weighted_count} entries using {RIME_ICE_SOURCE_LABEL}"
     )
 
 

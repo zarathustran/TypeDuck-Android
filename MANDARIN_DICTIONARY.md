@@ -12,11 +12,20 @@ For reproducible offline builds, this project therefore builds the Rime lexicon 
 - Data file: `data/cedict_ts.u8`
 - Build script: `script/build-mandarin-dictionary.py`
 
-The converter keeps each entry's **Traditional Chinese headword** and converts numbered Hanyu Pinyin to Rime's untone-numbered input spelling. Simplified headwords and English definitions are not packaged into the IME candidate lexicon.
+The converter keeps each entry's **Traditional Chinese headword** and converts numbered Hanyu Pinyin to Rime's untone-numbered input spelling. Simplified headwords are used only as a build-time key for frequency matching; English definitions are packaged separately for the candidate gloss UI.
+
+## Candidate ranking
+
+To improve common-word ordering without replacing the Traditional CEDICT lexicon, the build reads two frequency tables from the GPLv3-licensed [Rime-Ice](https://github.com/iDvel/rime-ice) project and applies those weights only when both the headword and Pinyin match a CEDICT entry:
+
+- Rime-Ice commit: `3aea6d3694fb3d94ec663641f021f788822897ad` (2026-09-25)
+- Tables: `cn_dicts/8105.dict.yaml` and `cn_dicts/base.dict.yaml`
+
+No Rime-Ice-only words are added to the TypeDuck candidate lexicon, so the Traditional output and CEDICT English-gloss coverage stay intact. Rime's user dictionary, commit history, contextual suggestions, sentence composition, and completion are enabled so ranking can adapt as the keyboard is used.
 
 ## Licensing
 
-Current CC-CEDICT data is distributed under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Generated `luna_pinyin.dict.yaml` data is redistributed under that same data license.
+Current CC-CEDICT data is distributed under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Generated `luna_pinyin.dict.yaml` contains CC-CEDICT-derived entries plus matching frequency weights derived from Rime-Ice; the applicable CC BY-SA 4.0 and Rime-Ice GPLv3 terms are retained here with source attribution.
 
 DICT.TW's published localized 2019 database notice identifies its snapshot as CC BY-SA 3.0 and says no additional restrictions are claimed. This repository does **not** claim that the generated lexicon contains DICT.TW's unpublished bulk-localization changes; DICT.TW is retained here as the requested Taiwanese-Mandarin reference and provenance note.
 
