@@ -28,6 +28,10 @@ Welcome to TypeDuck Mandarin: a Traditional Chinese Mandarin Pinyin keyboard."
 	</string-array>
 	<string name="refreshing">Refreshing…</string>
 	<string name="pref_refresh">Refresh</string>
+	<string name="pref_export_diagnostics">Export diagnostic ZIP</string>
+	<string name="pref_export_diagnostics_summary">Save crash, native, and Android process-exit logs to Downloads, then open the share sheet.</string>
+	<string name="diagnostics_saved">Saved %1$s to Downloads.</string>
+	<string name="diagnostics_export_failed">Could not create the diagnostic ZIP.</string>
 	<string name="pref_interface_language">介面語言 Interface Language</string>
 	<string name="pref_interface_language_zho">中文</string>
 	<string name="pref_interface_language_eng">English</string>
