@@ -102,7 +102,7 @@ object DiagnosticLogger {
 
         event("diagnostic export requested")
 
-        val fileName = "TypeDuck-Diagnostics-\${fileTimestamp(System.currentTimeMillis())}.zip"
+        val fileName = "TypeDuck-Diagnostics-${fileTimestamp(System.currentTimeMillis())}.zip"
         val exportDir = File(context.cacheDir, "diagnostics-export").apply { mkdirs() }
         val tempZip = File(exportDir, fileName)
         if (tempZip.exists()) tempZip.delete()
@@ -114,9 +114,9 @@ object DiagnosticLogger {
                 """
                 TypeDuck Mandarin diagnostic bundle
 
-                Generated: \${isoTimestamp(System.currentTimeMillis())}
-                App version: \${BuildConfig.VERSION_NAME} (\${BuildConfig.VERSION_CODE})
-                Git build: \${BuildConfig.BUILD_GIT_HASH}
+                Generated: ${isoTimestamp(System.currentTimeMillis())}
+                App version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})
+                Git build: ${BuildConfig.BUILD_GIT_HASH}
 
                 Contents may include Android app/package names, stack traces, memory addresses,
                 and TypeDuck/Rime log messages. The logger redacts obvious input-text log fields,
@@ -138,14 +138,14 @@ object DiagnosticLogger {
                     nativeStderrLog,
                     File(diagnosticsDir, "native-stderr.log.1")
                 ).filter { it.isFile }.forEach { file ->
-                    putFile(zip, "logs/\${file.name}", file)
+                    putFile(zip, "logs/${file.name}", file)
                 }
 
                 diagnosticsDir.listFiles()
                     ?.filter { it.isFile && it.name.startsWith("java-crash-") }
                     ?.sortedByDescending { it.lastModified() }
                     ?.take(MAX_JAVA_CRASH_FILES)
-                    ?.forEach { file -> putFile(zip, "java-crashes/\${file.name}", file) }
+                    ?.forEach { file -> putFile(zip, "java-crashes/${file.name}", file) }
             }
 
             putExitHistory(zip, context)
@@ -164,23 +164,23 @@ object DiagnosticLogger {
         }.getOrNull()
 
         return buildString {
-            appendLine("generated=\${isoTimestamp(System.currentTimeMillis())}")
-            appendLine("package=\${context.packageName}")
-            appendLine("versionName=\${packageInfo?.versionName ?: BuildConfig.VERSION_NAME}")
+            appendLine("generated=${isoTimestamp(System.currentTimeMillis())}")
+            appendLine("package=${context.packageName}")
+            appendLine("versionName=${packageInfo?.versionName ?: BuildConfig.VERSION_NAME}")
             @Suppress("DEPRECATION")
-            appendLine("versionCode=\${packageInfo?.versionCode ?: BuildConfig.VERSION_CODE}")
-            appendLine("git=\${BuildConfig.BUILD_GIT_HASH}")
-            appendLine("androidRelease=\${Build.VERSION.RELEASE}")
-            appendLine("sdkInt=\${Build.VERSION.SDK_INT}")
-            appendLine("manufacturer=\${Build.MANUFACTURER}")
-            appendLine("brand=\${Build.BRAND}")
-            appendLine("model=\${Build.MODEL}")
-            appendLine("device=\${Build.DEVICE}")
-            appendLine("product=\${Build.PRODUCT}")
-            appendLine("hardware=\${Build.HARDWARE}")
-            appendLine("fingerprint=\${Build.FINGERPRINT}")
-            appendLine("supportedAbis=\${Build.SUPPORTED_ABIS.joinToString(",")}")
-            appendLine("pageSize=\${pageSize ?: "unknown"}")
+            appendLine("versionCode=${packageInfo?.versionCode ?: BuildConfig.VERSION_CODE}")
+            appendLine("git=${BuildConfig.BUILD_GIT_HASH}")
+            appendLine("androidRelease=${Build.VERSION.RELEASE}")
+            appendLine("sdkInt=${Build.VERSION.SDK_INT}")
+            appendLine("manufacturer=${Build.MANUFACTURER}")
+            appendLine("brand=${Build.BRAND}")
+            appendLine("model=${Build.MODEL}")
+            appendLine("device=${Build.DEVICE}")
+            appendLine("product=${Build.PRODUCT}")
+            appendLine("hardware=${Build.HARDWARE}")
+            appendLine("fingerprint=${Build.FINGERPRINT}")
+            appendLine("supportedAbis=${Build.SUPPORTED_ABIS.joinToString(",")}")
+            appendLine("pageSize=${pageSize ?: "unknown"}")
         }
     }
 
@@ -197,25 +197,25 @@ object DiagnosticLogger {
             putText(
                 zip,
                 "system-exits/exit-info.txt",
-                "Unable to query process exits: \${Log.getStackTraceString(error)}\n"
+                "Unable to query process exits: ${Log.getStackTraceString(error)}\n"
             )
             return
         }
 
         val report = buildString {
-            appendLine("records=\${exits.size}")
+            appendLine("records=${exits.size}")
             exits.forEachIndexed { index, info ->
                 appendLine()
-                appendLine("[\$index]")
-                appendLine("timestamp=\${isoTimestamp(info.timestamp)}")
-                appendLine("reason=\${reasonName(info.reason)} (\${info.reason})")
-                appendLine("status=\${info.status}")
-                appendLine("description=\${info.description ?: ""}")
-                appendLine("processName=\${info.processName}")
-                appendLine("pid=\${info.pid}")
-                appendLine("importance=\${info.importance}")
-                appendLine("pssKb=\${info.pss}")
-                appendLine("rssKb=\${info.rss}")
+                appendLine("[$index]")
+                appendLine("timestamp=${isoTimestamp(info.timestamp)}")
+                appendLine("reason=${reasonName(info.reason)} (${info.reason})")
+                appendLine("status=${info.status}")
+                appendLine("description=${info.description ?: ""}")
+                appendLine("processName=${info.processName}")
+                appendLine("pid=${info.pid}")
+                appendLine("importance=${info.importance}")
+                appendLine("pssKb=${info.pss}")
+                appendLine("rssKb=${info.rss}")
             }
         }
         putText(zip, "system-exits/exit-info.txt", report)
@@ -231,7 +231,7 @@ object DiagnosticLogger {
                     "trace"
                 }
             val name =
-                "system-exits/exit-\${index}-\${info.timestamp}-\${reasonName(info.reason)}.\$extension"
+                "system-exits/exit-${index}-${info.timestamp}-${reasonName(info.reason)}.$extension"
             runCatching {
                 trace.use { input ->
                     zip.putNextEntry(ZipEntry(name))
@@ -242,7 +242,7 @@ object DiagnosticLogger {
                 runCatching { zip.closeEntry() }
                 putText(
                     zip,
-                    "system-exits/exit-\${index}-\${info.timestamp}-trace-error.txt",
+                    "system-exits/exit-${index}-${info.timestamp}-trace-error.txt",
                     Log.getStackTraceString(error)
                 )
             }
@@ -277,7 +277,7 @@ object DiagnosticLogger {
 
         return FileProvider.getUriForFile(
             context,
-            "\${BuildConfig.APPLICATION_ID}.diagnostics.fileprovider",
+            "${BuildConfig.APPLICATION_ID}.diagnostics.fileprovider",
             source
         )
     }
@@ -323,18 +323,18 @@ object DiagnosticLogger {
                 val crashFile =
                     File(
                         diagnosticsDir,
-                        "java-crash-\${fileTimestamp(System.currentTimeMillis())}.txt"
+                        "java-crash-${fileTimestamp(System.currentTimeMillis())}.txt"
                     )
                 val text = buildString {
-                    appendLine("timestamp=\${isoTimestamp(System.currentTimeMillis())}")
-                    appendLine("thread=\${thread.name}")
-                    appendLine("version=\${BuildConfig.VERSION_NAME} (\${BuildConfig.VERSION_CODE})")
-                    appendLine("git=\${BuildConfig.BUILD_GIT_HASH}")
+                    appendLine("timestamp=${isoTimestamp(System.currentTimeMillis())}")
+                    appendLine("thread=${thread.name}")
+                    appendLine("version=${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+                    appendLine("git=${BuildConfig.BUILD_GIT_HASH}")
                     appendLine()
                     append(Log.getStackTraceString(throwable))
                 }
                 crashFile.writeText(text)
-                appendLine(runtimeLog, "FATAL", "uncaught exception on \${thread.name}", throwable)
+                appendLine(runtimeLog, "FATAL", "uncaught exception on ${thread.name}", throwable)
                 pruneJavaCrashFiles()
             }
             previous?.uncaughtException(thread, throwable)
@@ -363,7 +363,7 @@ object DiagnosticLogger {
 
     private fun rotate(file: File) {
         if (!file.isFile || file.length() < MAX_LOG_BYTES) return
-        val old = File(file.parentFile, "\${file.name}.1")
+        val old = File(file.parentFile, "${file.name}.1")
         if (old.exists()) old.delete()
         file.renameTo(old)
     }
@@ -404,7 +404,7 @@ object DiagnosticLogger {
         patterns.forEach { pattern ->
             result = result.replace(pattern) { match ->
                 val prefix = match.groups[1]?.value ?: ""
-                "\${prefix}<redacted>"
+                "${prefix}<redacted>"
             }
         }
         return result
@@ -429,7 +429,7 @@ object DiagnosticLogger {
             ApplicationExitInfo.REASON_FREEZER -> "FREEZER"
             ApplicationExitInfo.REASON_PACKAGE_STATE_CHANGE -> "PACKAGE_STATE_CHANGE"
             ApplicationExitInfo.REASON_PACKAGE_UPDATED -> "PACKAGE_UPDATED"
-            else -> "REASON_\$reason"
+            else -> "REASON_$reason"
         }
 
     private fun isoTimestamp(timestamp: Long): String =
@@ -454,7 +454,7 @@ object DiagnosticLogger {
                     Log.ASSERT -> "ASSERT"
                     else -> priority.toString()
                 }
-            val prefix = if (tag.isNullOrBlank()) "" else "[\$tag] "
+            val prefix = if (tag.isNullOrBlank()) "" else "[$tag] "
             appendLine(runtimeLog, level, prefix + message, t)
         }
     }
