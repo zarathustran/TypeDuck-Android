@@ -72,7 +72,6 @@ public class Config {
   public Keyboards keyboards;
 
   public Config() {
-    self = this;
     ThemeManager.init();
 
     Rime.get();
@@ -82,6 +81,10 @@ public class Config {
     Timber.d("Setting sound from color ...");
     SoundThemeManager.switchSound(colors.getString("sound"));
 
+    // Publish the singleton only after construction has completed successfully. If Rime or theme
+    // initialization throws, Config.get() must be able to retry instead of returning a partially
+    // initialized instance with null maps.
+    self = this;
     Timber.d("Initialization finished");
   }
 
