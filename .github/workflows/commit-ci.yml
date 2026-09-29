@@ -3,6 +3,10 @@ on:
   push:
   workflow_dispatch:
 
+concurrency:
+  group: commit-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CI_NAME: Commit CI
 
