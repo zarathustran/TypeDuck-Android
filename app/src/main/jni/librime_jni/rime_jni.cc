@@ -53,7 +53,14 @@ public:
             // build_dictionary=false to workspace_update. TypeDuck Mandarin ships generated source
             // dictionaries rather than prebuilt *.table.bin files, so a real full deployment must
             // use RimeDeployWorkspace(), whose workspace_update builds dictionary tables.
-            rime->deploy();
+            //
+            // RimeDeployWorkspace() assumes the deployer module group is already loaded. Normal
+            // RimeInitialize() only loads the default runtime modules, so initialize the deployer
+            // explicitly before running the synchronous full deployment.
+            rime->deployer_initialize(&typeduck_traits);
+            if (!rime->deploy()) {
+                return;
+            }
         } else if (RimeStartQuick() && rime->is_maintenance_mode()) {
             rime->join_maintenance_thread();
         }
