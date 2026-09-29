@@ -92,11 +92,29 @@ def parse_entries(text: str) -> list[tuple[str, str, str, str]]:
     return entries
 
 
-def csv_row(fields: list[str]) -> str:
-    output = io.StringIO()
-    writer = csv.writer(output, lineterminator="")
-    writer.writerow(fields)
-    return output.getvalue()
+def csv_row(fields: list[str], force_quote_indexes: set[int] | None = None) -> str:
+    """Encode TypeDuck's comma-separated candidate metadata.
+
+    The native lookup filter expects the first two fields to remain unquoted because it
+    extracts them with string::find(',') and std::stoi(). Later fields are parsed as CSV
+    by the Android candidate layer, so we can force-quote the English gloss to keep
+    characters such as ': ' from confusing librime's YAML config scanner.
+    """
+    force_quote_indexes = force_quote_indexes or set()
+
+    def encode(index: int, value: str) -> str:
+        must_quote = (
+            index in force_quote_indexes
+            or "," in value
+            or '"' in value
+            or "\r" in value
+            or "\n" in value
+        )
+        if not must_quote:
+            return value
+        return '"' + value.replace('"', '""') + '"'
+
+    return ",".join(encode(index, value) for index, value in enumerate(fields))
 
 
 def build_lookup_row(
@@ -122,7 +140,7 @@ def build_lookup_row(
     fields[2] = "0"
     fields[11] = definition
 
-    row = csv_row(fields)
+    row = csv_row(fields, force_quote_indexes={11})
     parsed = next(csv.reader([row]))
     if len(parsed) != len(fields) or not parsed[1].isdigit():
         raise RuntimeError("Generated an invalid TypeDuck lookup row")
