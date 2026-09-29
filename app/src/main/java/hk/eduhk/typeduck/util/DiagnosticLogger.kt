@@ -90,7 +90,17 @@ object DiagnosticLogger {
         val rendered = runCatching {
             if (args.isEmpty()) message else String.format(Locale.ROOT, message, *args)
         }.getOrElse { message }
-        appendLine(runtimeLog, "EVENT", rendered)
+        val sanitized = sanitize(rendered)
+        appendLine(runtimeLog, "EVENT", sanitized)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && ::appContext.isInitialized) {
+            runCatching {
+                val activityManager =
+                    appContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                activityManager.setProcessStateSummary(
+                    sanitized.toByteArray(Charsets.UTF_8).take(128).toByteArray()
+                )
+            }
+        }
     }
 
     /**
@@ -216,6 +226,10 @@ object DiagnosticLogger {
                 appendLine("importance=${info.importance}")
                 appendLine("pssKb=${info.pss}")
                 appendLine("rssKb=${info.rss}")
+                appendLine(
+                    "processStateSummary=" +
+                        info.processStateSummary?.toString(Charsets.UTF_8).orEmpty()
+                )
             }
         }
         putText(zip, "system-exits/exit-info.txt", report)
