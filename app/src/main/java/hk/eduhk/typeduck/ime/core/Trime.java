@@ -239,9 +239,11 @@ public class Trime extends LifecycleInputMethodService {
   private static final Handler syncBackgroundHandler =
       new Handler(
           msg -> {
-            if (!((Trime) msg.obj).isShowInputRequested()) { // 若当前没有输入面板，则后台同步。防止面板关闭后5秒内再次打开
+            final Trime service = (Trime) msg.obj;
+            if (service.imeReady
+                && !service.isShowInputRequested()) { // 若当前没有输入面板，则后台同步。防止面板关闭后5秒内再次打开
               ShortcutUtils.INSTANCE.syncInBackground();
-              ((Trime) msg.obj).loadConfig();
+              service.loadConfig();
             }
             return false;
           });
@@ -361,7 +363,7 @@ public class Trime extends LifecycleInputMethodService {
     }
     isWindowShown = false;
 
-    if (getPrefs().getProfile().getSyncBackgroundEnabled()) {
+    if (imeReady && getPrefs().getProfile().getSyncBackgroundEnabled()) {
       final Message msg = new Message();
       msg.obj = this;
       syncBackgroundHandler.sendMessageDelayed(msg, 5000); // 输入面板隐藏5秒后，开始后台同步
@@ -517,6 +519,7 @@ public class Trime extends LifecycleInputMethodService {
   }
 
   public void invalidate() {
+    if (!imeReady) return;
     Rime.get();
     getImeConfig().destroy();
     reset();
@@ -696,7 +699,7 @@ public class Trime extends LifecycleInputMethodService {
   @Override
   public void onConfigurationChanged(@NonNull Configuration newConfig) {
     final Configuration config = getResources().getConfiguration();
-    if (config != null) {
+    if (imeReady && config != null) {
       if (config.orientation != newConfig.orientation) {
         // Clear composing text and candidates for orientation change.
         performEscape();
