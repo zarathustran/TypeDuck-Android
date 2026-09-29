@@ -48,6 +48,7 @@ import android.view.inputmethod.ExtractedText;
 import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
 import android.widget.PopupWindow;
+import android.widget.TextView;
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -123,6 +124,10 @@ public class Trime extends LifecycleInputMethodService {
   public EditorInfo editorInfo = null;
 
   private boolean isWindowShown = false; // 键盘窗口是否已显示
+  private volatile boolean imeReady = false;
+  private volatile boolean imeInitializationStarted = false;
+  private volatile boolean imeInitializationFailed = false;
+  private final Handler imeInitializationHandler = new Handler(Looper.getMainLooper());
 
   private boolean isAutoCaps; // 句首自動大寫
 
@@ -247,12 +252,75 @@ public class Trime extends LifecycleInputMethodService {
       self = this;
       textInputManager = TextInputManager.Companion.getInstance();
       DiagnosticLogger.INSTANCE.event("Trime constructor got TextInputManager");
-      loadConfig();
-      DiagnosticLogger.INSTANCE.event("Trime constructor completed");
+      DiagnosticLogger.INSTANCE.event("Trime constructor returned without blocking on Rime");
     } catch (Exception e) {
       Timber.e(e, "Trime constructor initialization failed");
       DiagnosticLogger.INSTANCE.event("Trime constructor failed: %s", e.getClass().getName());
     }
+  }
+
+  private synchronized void startImeInitialization() {
+    if (imeInitializationStarted || imeReady) return;
+    imeInitializationStarted = true;
+    DiagnosticLogger.INSTANCE.event("Trime background initialization started");
+    new Thread(
+            () -> {
+              try {
+                final Config config = getImeConfig();
+                imeInitializationHandler.post(() -> finishImeInitialization(config));
+              } catch (Exception e) {
+                Timber.e(e, "Background IME initialization failed");
+                DiagnosticLogger.INSTANCE.event(
+                    "Trime background initialization failed: %s", e.getClass().getName());
+                imeInitializationHandler.post(
+                    () -> {
+                      imeInitializationFailed = true;
+                      if (isInputViewShown()) setInputView(createLoadingInputView());
+                    });
+              }
+            },
+            "TypeDuckImeInit")
+        .start();
+  }
+
+  private void finishImeInitialization(@NonNull Config config) {
+    if (self != this) return;
+    try {
+      setDarkMode(
+          (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+              == Configuration.UI_MODE_NIGHT_YES);
+      config.initCurrentColors(darkMode);
+      loadConfig();
+      liquidKeyboard = new LiquidKeyboard(this);
+      imeReady = true;
+      DiagnosticLogger.INSTANCE.event("Trime background initialization completed");
+
+      if (isInputViewShown()) {
+        setInputView(createReadyInputView());
+        if (editorInfo != null) startInputViewReady(editorInfo, false);
+      }
+    } catch (Exception e) {
+      imeInitializationFailed = true;
+      Timber.e(e, "Finishing IME initialization failed");
+      DiagnosticLogger.INSTANCE.event(
+          "Trime initialization completion failed: %s", e.getClass().getName());
+      if (isInputViewShown()) setInputView(createLoadingInputView());
+    }
+  }
+
+  @NonNull
+  private View createLoadingInputView() {
+    final TextView loading = new TextView(this);
+    final boolean dark =
+        (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+            == Configuration.UI_MODE_NIGHT_YES;
+    loading.setGravity(Gravity.CENTER);
+    loading.setText(imeInitializationFailed ? "TypeDuck initialization failed" : "Preparing TypeDuck…");
+    loading.setTextSize(16);
+    loading.setTextColor(dark ? Color.WHITE : Color.DKGRAY);
+    loading.setBackgroundColor(dark ? Color.rgb(32, 33, 36) : Color.rgb(248, 249, 250));
+    loading.setMinHeight((int) DimensionsKt.dp2px(240f));
+    return loading;
   }
 
   @Override
@@ -265,6 +333,11 @@ public class Trime extends LifecycleInputMethodService {
       Timber.i("onWindowShown...");
     }
     isWindowShown = true;
+
+    if (!imeReady) {
+      Timber.i("IME window shown while Rime is still initializing");
+      return;
+    }
 
     updateComposing();
 
@@ -350,10 +423,6 @@ public class Trime extends LifecycleInputMethodService {
   @Override
   public void onCreate() {
     DiagnosticLogger.INSTANCE.event("Trime.onCreate entered");
-    setDarkMode((getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES);
-    DiagnosticLogger.INSTANCE.event("Trime.onCreate initializing colors");
-    getImeConfig().initCurrentColors(darkMode);
-    DiagnosticLogger.INSTANCE.event("Trime.onCreate colors initialized");
     StrictMode.setVmPolicy(
         new StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())
             .detectLeakedClosableObjects()
@@ -361,32 +430,20 @@ public class Trime extends LifecycleInputMethodService {
     String methodName =
         "\t<TrimeInit>\t" + Thread.currentThread().getStackTrace()[2].getMethodName() + "\t";
     Timber.d(methodName);
-    // MUST WRAP all code within Service onCreate() in try..catch to prevent any crash loops
     try {
-      // Additional try..catch wrapper as the event listeners chain or the super.onCreate() method
-      // could crash
-      //  and lead to a crash loop
-      try {
-        Timber.i("onCreate...");
-
-        activeEditorInstance = new EditorInstance(this);
-        Timber.d(methodName + "InputFeedbackManager");
-        inputFeedbackManager = new InputFeedbackManager(this);
-
-        Timber.d(methodName + "liquidKeyboard");
-        liquidKeyboard = new LiquidKeyboard(this);
-      } catch (Exception e) {
-        Timber.e(e, "Trime service dependency initialization failed");
-        DiagnosticLogger.INSTANCE.event("Trime.onCreate dependency init failed: %s", e.getClass().getName());
-        super.onCreate();
-        return;
-      }
       Timber.d(methodName + "super.onCreate()");
       super.onCreate();
-      Timber.d(methodName + "create listener");
+
+      Timber.i("onCreate...");
+      activeEditorInstance = new EditorInstance(this);
+      Timber.d(methodName + "InputFeedbackManager");
+      inputFeedbackManager = new InputFeedbackManager(this);
+
       for (EventListener listener : eventListeners) {
         if (listener != null) listener.onCreate();
       }
+
+      startImeInitialization();
     } catch (Exception e) {
       Timber.e(e, "Trime service onCreate failed");
       DiagnosticLogger.INSTANCE.event("Trime.onCreate failed: %s", e.getClass().getName());
@@ -651,6 +708,7 @@ public class Trime extends LifecycleInputMethodService {
 
   @Override
   public void onUpdateCursorAnchorInfo(CursorAnchorInfo cursorAnchorInfo) {
+    if (!imeReady) return;
     if (!isWinFixed()) {
       final CharSequence composingText = cursorAnchorInfo.getComposingText();
       // update mPopupRectF
@@ -695,6 +753,7 @@ public class Trime extends LifecycleInputMethodService {
       int candidatesEnd) {
     super.onUpdateSelection(
         oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd);
+    if (!imeReady) return;
     if ((candidatesEnd != -1) && ((newSelStart != candidatesEnd) || (newSelEnd != candidatesEnd))) {
       // 移動光標時，更新候選區
       if ((newSelEnd < candidatesEnd) && (newSelEnd >= candidatesStart)) {
@@ -720,17 +779,23 @@ public class Trime extends LifecycleInputMethodService {
   @Override
   public View onCreateInputView() {
     DiagnosticLogger.INSTANCE.event("Trime.onCreateInputView entered");
-    Timber.e("onCreateInputView()");
-    // 初始化键盘布局
+    if (!imeReady) {
+      Timber.i("Returning temporary input view while Rime initializes");
+      return createLoadingInputView();
+    }
+    return createReadyInputView();
+  }
+
+  @NonNull
+  private View createReadyInputView() {
+    Timber.e("createReadyInputView()");
     super.onCreateInputView();
     inputRootBinding = InputRootBinding.inflate(LayoutInflater.from(this));
     mainKeyboardView = inputRootBinding.main.mainKeyboardView;
 
-    // 初始化候选栏
     mCandidateRoot = inputRootBinding.main.candidateView.candidateRoot;
     mCandidate = inputRootBinding.main.candidateView.candidates;
 
-    // 候选词悬浮窗的容器
     compositionRootBinding = CompositionRootBinding.inflate(LayoutInflater.from(this));
     mComposition = compositionRootBinding.compositions;
     mPopupWindow = new PopupWindow(compositionRootBinding.compositionRoot);
@@ -753,9 +818,8 @@ public class Trime extends LifecycleInputMethodService {
     loadBackground();
 
     KeyboardSwitcher.newOrReset();
-    Timber.i("onCreateInputView() finish");
+    Timber.i("createReadyInputView() finish");
     DiagnosticLogger.INSTANCE.event("Trime.onCreateInputView completed");
-
     return inputRootBinding.inputRoot;
   }
 
@@ -773,6 +837,14 @@ public class Trime extends LifecycleInputMethodService {
         attribute.packageName);
     Timber.d("onStartInputView: restarting=%s", restarting);
     editorInfo = attribute;
+    if (!imeReady) {
+      Timber.i("Deferring input-view setup until Rime initialization completes");
+      return;
+    }
+    startInputViewReady(attribute, restarting);
+  }
+
+  private void startInputViewReady(EditorInfo attribute, boolean restarting) {
     if (getPrefs().getThemeAndColor().getAutoDark()) {
       int nightModeFlags =
           getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
@@ -862,12 +934,16 @@ public class Trime extends LifecycleInputMethodService {
 
   @Override
   public void onFinishInputView(boolean finishingInput) {
+    if (!imeReady) {
+      super.onFinishInputView(finishingInput);
+      return;
+    }
     if (normalTextEditor) {
       DraftHelper.INSTANCE.onInputEventChanged();
     }
     super.onFinishInputView(finishingInput);
     // Dismiss any pop-ups when the input-view is being finished and hidden.
-    mainKeyboardView.closing();
+    if (mainKeyboardView != null) mainKeyboardView.closing();
     performEscape();
     if (inputFeedbackManager != null) inputFeedbackManager.releaseSoundPool();
     try {
@@ -897,6 +973,7 @@ public class Trime extends LifecycleInputMethodService {
    * a sentence.
    */
   private void dispatchCapsStateToInputView() {
+    if (!imeReady) return;
     if ((isAutoCaps && Rime.isAsciiMode())
         && (mainKeyboardView != null && !mainKeyboardView.isCapsOn())) {
       mainKeyboardView.setShifted(false, activeEditorInstance.getCursorCapsMode() != 0);
@@ -932,6 +1009,7 @@ public class Trime extends LifecycleInputMethodService {
   }
 
   public boolean onRimeKey(int[] event) {
+    if (!imeReady) return false;
     updateRimeOption();
     // todo 改为异步处理按键事件、刷新UI
     final boolean ret = Rime.processKey(event[0], event[1]);
@@ -959,6 +1037,7 @@ public class Trime extends LifecycleInputMethodService {
 
   @Override
   public boolean onKeyDown(int keyCode, KeyEvent event) {
+    if (!imeReady) return super.onKeyDown(keyCode, event);
     Timber.i("\t<TrimeInput>\tonKeyDown()\tkeycode=%d, event=%s", keyCode, event.toString());
     if (composeEvent(event) && onKeyEvent(event)) return true;
     return super.onKeyDown(keyCode, event);
@@ -966,6 +1045,7 @@ public class Trime extends LifecycleInputMethodService {
 
   @Override
   public boolean onKeyUp(int keyCode, KeyEvent event) {
+    if (!imeReady) return super.onKeyUp(keyCode, event);
     Timber.i("\t<TrimeInput>\tonKeyUp()\tkeycode=%d, event=%s", keyCode, event.toString());
     if (composeEvent(event) && textInputManager.getNeedSendUpRimeKey()) {
       textInputManager.onRelease(keyCode);
