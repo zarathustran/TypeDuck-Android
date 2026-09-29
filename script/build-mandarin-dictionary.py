@@ -58,6 +58,11 @@ def clean_definition(raw: str) -> str:
         if len(senses) == 3:
             break
     definition = "; ".join(senses)
+    # Rime's sync/config scanner also opens *.dict.yaml files as YAML. Dictionary
+    # entries are TSV data after the YAML header, but a plain-scalar ": " or " #"
+    # in a gloss can still confuse yaml-cpp before the dictionary compiler sees it.
+    # Use visually clear Unicode punctuation that is harmless to both parsers.
+    definition = definition.replace(": ", "： ").replace(" #", " №")
     return definition[:240]
 
 
