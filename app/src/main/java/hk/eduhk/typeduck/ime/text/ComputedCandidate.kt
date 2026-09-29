@@ -42,8 +42,10 @@ sealed class ComputedCandidate(var geometry: Rect) {
             } else
                 listOf()
 
-            entry = entries.firstOrNull { it.matchInputBuffer == "1" }
-            hasDictionaryEntry = entries.any { it.isDictionaryEntry }
+            val matchedEntry = entries.firstOrNull { it.matchInputBuffer == "1" }
+            val dictionaryEntry = entries.firstOrNull { it.isDictionaryEntry }
+            entry = matchedEntry ?: dictionaryEntry ?: entries.firstOrNull()
+            hasDictionaryEntry = dictionaryEntry != null
             romanization = entry?.jyutping ?: (if (isReverseLookup) "" else note)
         }
 

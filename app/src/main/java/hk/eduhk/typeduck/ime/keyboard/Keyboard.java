@@ -18,6 +18,7 @@
 
 package hk.eduhk.typeduck.ime.keyboard;
 
+import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.util.TypedValue;
 import android.view.KeyEvent;
@@ -118,10 +119,31 @@ public class Keyboard {
 
     final double interpolation = Math.pow(1.0 - Math.pow(screenNarrowness, 5.0), 5.0);
     final double keyboardHeightWithCandidateBar = keyboardHeightForNarrowScreen * interpolation + keyboardHeightForNormalScreen * (1.0 - interpolation);
-    keyboardHeight = (int) (keyboardHeightWithCandidateBar * 0.9 - DimensionsKt.dp2px(40f) * adjustRatioSmall);
+    keyboardHeight =
+        (int)
+            (keyboardHeightWithCandidateBar * 0.98
+                - DimensionsKt.dp2px(32f) * adjustRatioSmall);
 
-    final double ratio = 2.0 * Math.min(keyboardHeightWithCandidateBar / width, 0.45);
-    mDisplayWidth = (int) (width - 2.0 * Math.round(width / 4.0 * (1.0 + 1.5048001186256637 * Math.pow(ratio, 12.0) - 1.2196050890844857 * Math.pow(ratio, 8.0) - ratio)));
+    final boolean isPhone =
+        Resources.getSystem().getConfiguration().smallestScreenWidthDp < 600;
+    if (isPhone) {
+      // Phones already have limited key width. The old ergonomic narrowing made QWERTY keys
+      // needlessly small on large phones, so use the available portrait width.
+      mDisplayWidth = (int) width;
+    } else {
+      final double ratio = 2.0 * Math.min(keyboardHeightWithCandidateBar / width, 0.45);
+      mDisplayWidth =
+          (int)
+              (width
+                  - 2.0
+                      * Math.round(
+                          width
+                              / 4.0
+                              * (1.0
+                                  + 1.5048001186256637 * Math.pow(ratio, 12.0)
+                                  - 1.2196050890844857 * Math.pow(ratio, 8.0)
+                                  - ratio)));
+    }
     // width and mDisplayWidth must have the same parity since the padding must be an integer
 
     mDisplayWidth -= DimensionsKt.dp2px(Config.get().style.getFloat("keyboard_padding")) * 2;
