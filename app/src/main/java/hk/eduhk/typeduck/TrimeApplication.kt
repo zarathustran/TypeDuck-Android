@@ -8,6 +8,7 @@ import hk.eduhk.typeduck.data.AppPrefs
 import hk.eduhk.typeduck.data.db.ClipboardHelper
 import hk.eduhk.typeduck.data.db.CollectionHelper
 import hk.eduhk.typeduck.data.db.DraftHelper
+import hk.eduhk.typeduck.util.DiagnosticLogger
 import timber.log.Timber
 
 /**
@@ -34,6 +35,8 @@ class TrimeApplication : Application() {
             .enabled(!BuildConfig.DEBUG)
             .apply()
         instance = this
+        DiagnosticLogger.init(this)
+        DiagnosticLogger.event("TrimeApplication.onCreate started")
         try {
             if (BuildConfig.DEBUG) {
                 Timber.plant(Timber.DebugTree())
@@ -53,8 +56,10 @@ class TrimeApplication : Application() {
             ClipboardHelper.init(applicationContext)
             CollectionHelper.init(applicationContext)
             DraftHelper.init(applicationContext)
+            DiagnosticLogger.event("TrimeApplication.onCreate completed")
         } catch (e: Exception) {
-            e.fillInStackTrace()
+            Timber.e(e, "TrimeApplication initialization failed")
+            DiagnosticLogger.event("TrimeApplication.onCreate failed: %s", e.javaClass.name)
             return
         }
     }
