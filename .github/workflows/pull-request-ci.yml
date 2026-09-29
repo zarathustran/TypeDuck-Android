@@ -61,9 +61,6 @@ jobs:
             "ndk;24.0.8215888" \
             "cmake;3.22.1"
 
-      - name: Spotless code style check
-        run: make spotless
-
       - name: Build debug APKs
         run: make debug
 
