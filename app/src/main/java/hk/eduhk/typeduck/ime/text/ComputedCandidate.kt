@@ -28,6 +28,7 @@ sealed class ComputedCandidate(var geometry: Rect) {
         val entry: CandidateEntry?
         val hasDictionaryEntry: Boolean
         val romanization: String
+        val definition: String?
 
         init {
             val comment = Comment(comment)
@@ -43,10 +44,49 @@ sealed class ComputedCandidate(var geometry: Rect) {
                 listOf()
 
             val matchedEntry = entries.firstOrNull { it.matchInputBuffer == "1" }
-            val dictionaryEntry = entries.firstOrNull { it.isDictionaryEntry }
-            entry = matchedEntry ?: dictionaryEntry ?: entries.firstOrNull()
-            hasDictionaryEntry = dictionaryEntry != null
-            romanization = entry?.jyutping ?: (if (isReverseLookup) "" else note)
+            val dictionaryEntries = entries.filter { it.isDictionaryEntry }
+            val exactDictionaryEntry =
+                dictionaryEntries.firstOrNull { it.honzi == word && it.matchInputBuffer == "1" }
+                    ?: dictionaryEntries.firstOrNull { it.honzi == word }
+            val matchedDictionaryEntry =
+                dictionaryEntries.firstOrNull { it.matchInputBuffer == "1" }
+
+            // The dictionary lookup filter emits a synthetic matched "composition" row for
+            // sentence candidates, followed by the real dictionary rows for their components.
+            // Prefer real dictionary metadata for display instead of letting that synthetic row
+            // hide the English definition.
+            entry = exactDictionaryEntry
+                ?: matchedDictionaryEntry
+                ?: dictionaryEntries.firstOrNull()
+                ?: matchedEntry
+                ?: entries.firstOrNull()
+            hasDictionaryEntry = dictionaryEntries.isNotEmpty()
+            romanization = matchedEntry?.jyutping
+                ?: entry?.jyutping
+                ?: (if (isReverseLookup) "" else note)
+
+            val exactDefinition = exactDictionaryEntry?.englishDefinition
+                ?: exactDictionaryEntry?.mainLanguageOrLabel
+            if (!exactDefinition.isNullOrEmpty()) {
+                definition = exactDefinition
+            } else if (dictionaryEntries.isNotEmpty()) {
+                // For Rime-composed phrases that do not have one CEDICT row, show a concise
+                // component gloss rather than the meaningless "(composition)" marker.
+                definition = dictionaryEntries
+                    .groupBy { it.honzi.orEmpty() }
+                    .values
+                    .mapNotNull { group ->
+                        group.firstOrNull { it.matchInputBuffer == "1" && !it.englishDefinition.isNullOrEmpty() }
+                            ?.englishDefinition
+                            ?: group.firstNotNullOfOrNull { it.englishDefinition ?: it.mainLanguageOrLabel }
+                    }
+                    .distinct()
+                    .take(2)
+                    .joinToString(" · ")
+                    .ifEmpty { null }
+            } else {
+                definition = entry?.mainLanguageOrLabel
+            }
         }
 
         override fun toString(): String {

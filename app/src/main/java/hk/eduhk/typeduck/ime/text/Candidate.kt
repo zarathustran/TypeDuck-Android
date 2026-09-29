@@ -258,11 +258,11 @@ class Candidate(context: Context?, attrs: AttributeSet?) : View(context, attrs) 
 				candidatePaint.color = primaryColor
 				canvas.drawText(word, centerX, wordY, candidatePaint, candidateFont!!)
 
-				val definition = computedCandidate.entry?.mainLanguageOrLabel
+				val definition = computedCandidate.definition
 				if (!definition.isNullOrEmpty()) {
 					val definitionY = geometry.top + topCommentsHeight + candidateHeight + commentHeight / 2.0f -
 							(commentPaint.ascent() + commentPaint.descent()) / 2
-					commentPaint.color = if (computedCandidate.entry.isDictionaryEntry) primaryColor else secondaryColor
+					commentPaint.color = if (computedCandidate.hasDictionaryEntry) primaryColor else secondaryColor
 					val definitionWidth = geometry.width() + 1f - candidatePadding * 2f - (if (computedCandidate.hasDictionaryEntry) commentHeight / 2f else 0f)
 					val trimmedDefinition = TextUtils.ellipsize(definition, commentPaint, definitionWidth, TextUtils.TruncateAt.END).toString()
 					canvas.drawText(trimmedDefinition, centerX, definitionY, commentPaint, commentFont!!)
@@ -350,7 +350,7 @@ class Candidate(context: Context?, attrs: AttributeSet?) : View(context, attrs) 
 				val textWidth = commentPaint.measureText(text, candidateFont!!)
 				candidateWidth = candidateWidth.coerceAtLeast(textWidth)
 			}
-			val definition = candidate.entry?.mainLanguageOrLabel
+			val definition = candidate.definition
 			if (!definition.isNullOrEmpty()) {
 				val definitionWidth = commentPaint.measureText(definition, commentFont!!)
 				candidateWidth = candidateWidth.coerceAtLeast(definitionWidth.coerceAtMost(candidateWidth + commentHeight * 4))
