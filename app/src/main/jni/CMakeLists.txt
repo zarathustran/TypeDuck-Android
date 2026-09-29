@@ -8,6 +8,11 @@ add_link_options("LINKER:--hash-style=gnu,--build-id=none")
 set(ANDROID_STL c++_shared)
 set(CMAKE_CXX_STANDARD 17)
 
+# Keep frame pointers in debug builds so native crash tombstones are easier to unwind.
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_compile_options("-fno-omit-frame-pointer")
+endif()
+
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 # general options
