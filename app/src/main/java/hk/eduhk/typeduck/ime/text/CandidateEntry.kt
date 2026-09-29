@@ -179,6 +179,12 @@ data class CandidateEntry(
 	val mainLanguage: String?
 		get() = getDefinition(prefMainLanguage)
 
+	val englishDefinition: String?
+		get() = getDefinition(Language.ENG)
+
+	private val firstAvailableDefinition: String?
+		get() = Language.values().firstNotNullOfOrNull { getDefinition(it) }
+
 	val otherLanguages: List<String>
 		get() = prefDisplayLanguages
 			.filter { it != prefMainLanguage }
@@ -195,13 +201,20 @@ data class CandidateEntry(
 		get() = properties.label?.split(" ")?.map { "($it)" }
 
 	val mainLanguageOrLabel: String?
-		get() = if (isDictionaryEntry) mainLanguage else formattedLabels?.joinToString(" ")
+		get() = if (isDictionaryEntry) {
+			mainLanguage ?: englishDefinition ?: firstAvailableDefinition
+		} else {
+			formattedLabels?.joinToString(" ")
+		}
 
 	val otherLanguagesOrLabels: List<String>
 		get() = if (isDictionaryEntry) otherLanguages else formattedLabels.orEmpty()
 
 	val isDictionaryEntry: Boolean
-		get() = !isJyutpingOnly && (checkColumns.any { this[it] != null } || prefDisplayLanguages.any { getDefinition(it) != null })
+		get() = !isJyutpingOnly && (
+			checkColumns.any { this[it] != null } ||
+			Language.values().any { getDefinition(it) != null }
+		)
 }
 
 fun <T> Iterator<T>.asPeekable(): PeekableIterator<T> = PeekableIterator(this)
