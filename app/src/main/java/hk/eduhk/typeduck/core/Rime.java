@@ -203,7 +203,27 @@ public class Rime {
 
   public static void initSchema() {
     Timber.d("initSchema() RimeSchema");
-    SchemaManager.init(getCurrentRimeSchema());
+    String schemaId = getCurrentRimeSchema();
+    if (schemaId == null || schemaId.isEmpty() || ".default".equals(schemaId)) {
+      Timber.w("Rime started without a concrete schema (%s); selecting the first deployed schema", schemaId);
+      final SchemaListItem[] schemas = getRimeSchemaList();
+      if (schemas != null) {
+        for (SchemaListItem schema : schemas) {
+          if (schema == null || schema.getSchemaId() == null || schema.getSchemaId().isEmpty()) {
+            continue;
+          }
+          if (selectRimeSchema(schema.getSchemaId())) {
+            schemaId = schema.getSchemaId();
+            Timber.i("Selected fallback schema: %s", schemaId);
+            break;
+          }
+        }
+      }
+    }
+    if (schemaId == null || schemaId.isEmpty() || ".default".equals(schemaId)) {
+      throw new IllegalStateException("Rime did not provide a usable input schema");
+    }
+    SchemaManager.init(schemaId);
     Timber.d("initSchema() getStatus");
     getStatus();
   }
