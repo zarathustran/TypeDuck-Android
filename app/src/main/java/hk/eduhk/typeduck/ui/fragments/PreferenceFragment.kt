@@ -1,7 +1,9 @@
 package hk.eduhk.typeduck.ui.fragments
 
+import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
+import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.preference.ListPreference
@@ -18,8 +20,10 @@ import hk.eduhk.typeduck.ime.text.Language
 import hk.eduhk.typeduck.ime.text.Size
 import hk.eduhk.typeduck.ui.components.PaddingPreferenceFragment
 import hk.eduhk.typeduck.ui.components.TestIMEPreference
+import hk.eduhk.typeduck.util.DiagnosticLogger
 import hk.eduhk.typeduck.util.withLoadingDialog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.EnumSet
 
@@ -59,6 +63,43 @@ class PreferenceFragment :
                         ResourceUtils.copyFileFromAssets("rime", DataManager.sharedDataDir.absolutePath)
                         Rime.syncRimeUserData()
                         Rime.deployRime()
+                    }
+                }
+                true
+            }
+            get<Preference>("pref_export_diagnostics")?.setOnPreferenceClickListener {
+                val fragmentContext = context ?: return@setOnPreferenceClickListener false
+                lifecycleScope.launch {
+                    try {
+                        val bundle = withContext(Dispatchers.IO) {
+                            DiagnosticLogger.exportBundle(fragmentContext)
+                        }
+                        Toast.makeText(
+                            fragmentContext,
+                            getString(R.string.diagnostics_saved, bundle.fileName),
+                            Toast.LENGTH_LONG
+                        ).show()
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "application/zip"
+                            putExtra(Intent.EXTRA_STREAM, bundle.uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        startActivity(
+                            Intent.createChooser(
+                                shareIntent,
+                                getString(R.string.pref_export_diagnostics)
+                            )
+                        )
+                    } catch (error: Exception) {
+                        DiagnosticLogger.event(
+                            "diagnostic export failed: %s",
+                            error.javaClass.name
+                        )
+                        Toast.makeText(
+                            fragmentContext,
+                            R.string.diagnostics_export_failed,
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
                 true
