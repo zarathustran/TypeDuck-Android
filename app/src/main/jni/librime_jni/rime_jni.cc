@@ -48,7 +48,13 @@ public:
                                       *JString(env, message_type),
                                       *JString(env, message_value));
         }, GlobalRef->jvm);
-        if ((!fullCheck && RimeStartQuick() || rime->start_maintenance(true)) && rime->is_maintenance_mode()) {
+        if (fullCheck) {
+            // RimeStartMaintenance(true) rebuilds schema configuration but intentionally passes
+            // build_dictionary=false to workspace_update. TypeDuck Mandarin ships generated source
+            // dictionaries rather than prebuilt *.table.bin files, so a real full deployment must
+            // use RimeDeployWorkspace(), whose workspace_update builds dictionary tables.
+            rime->deploy();
+        } else if (RimeStartQuick() && rime->is_maintenance_mode()) {
             rime->join_maintenance_thread();
         }
 
