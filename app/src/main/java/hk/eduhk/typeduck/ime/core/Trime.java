@@ -79,6 +79,7 @@ import hk.eduhk.typeduck.ime.text.Candidate;
 import hk.eduhk.typeduck.ime.text.Composition;
 import hk.eduhk.typeduck.ime.text.ScrollView;
 import hk.eduhk.typeduck.ime.text.TextInputManager;
+import hk.eduhk.typeduck.util.DiagnosticLogger;
 import hk.eduhk.typeduck.util.DimensionsKt;
 import hk.eduhk.typeduck.util.ShortcutUtils;
 import hk.eduhk.typeduck.util.StringUtils;
@@ -241,12 +242,16 @@ public class Trime extends LifecycleInputMethodService {
           });
 
   public Trime() {
+    DiagnosticLogger.INSTANCE.event("Trime constructor started");
     try {
       self = this;
       textInputManager = TextInputManager.Companion.getInstance();
+      DiagnosticLogger.INSTANCE.event("Trime constructor got TextInputManager");
       loadConfig();
+      DiagnosticLogger.INSTANCE.event("Trime constructor completed");
     } catch (Exception e) {
-      e.fillInStackTrace();
+      Timber.e(e, "Trime constructor initialization failed");
+      DiagnosticLogger.INSTANCE.event("Trime constructor failed: %s", e.getClass().getName());
     }
   }
 
@@ -344,8 +349,11 @@ public class Trime extends LifecycleInputMethodService {
 
   @Override
   public void onCreate() {
+    DiagnosticLogger.INSTANCE.event("Trime.onCreate entered");
     setDarkMode((getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES);
+    DiagnosticLogger.INSTANCE.event("Trime.onCreate initializing colors");
     getImeConfig().initCurrentColors(darkMode);
+    DiagnosticLogger.INSTANCE.event("Trime.onCreate colors initialized");
     StrictMode.setVmPolicy(
         new StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())
             .detectLeakedClosableObjects()
@@ -368,7 +376,8 @@ public class Trime extends LifecycleInputMethodService {
         Timber.d(methodName + "liquidKeyboard");
         liquidKeyboard = new LiquidKeyboard(this);
       } catch (Exception e) {
-        e.printStackTrace();
+        Timber.e(e, "Trime service dependency initialization failed");
+        DiagnosticLogger.INSTANCE.event("Trime.onCreate dependency init failed: %s", e.getClass().getName());
         super.onCreate();
         return;
       }
@@ -379,9 +388,11 @@ public class Trime extends LifecycleInputMethodService {
         if (listener != null) listener.onCreate();
       }
     } catch (Exception e) {
-      e.fillInStackTrace();
+      Timber.e(e, "Trime service onCreate failed");
+      DiagnosticLogger.INSTANCE.event("Trime.onCreate failed: %s", e.getClass().getName());
     }
     Timber.d(methodName + "finish");
+    DiagnosticLogger.INSTANCE.event("Trime.onCreate completed");
   }
 
   /**
@@ -708,6 +719,7 @@ public class Trime extends LifecycleInputMethodService {
 
   @Override
   public View onCreateInputView() {
+    DiagnosticLogger.INSTANCE.event("Trime.onCreateInputView entered");
     Timber.e("onCreateInputView()");
     // 初始化键盘布局
     super.onCreateInputView();
@@ -742,6 +754,7 @@ public class Trime extends LifecycleInputMethodService {
 
     KeyboardSwitcher.newOrReset();
     Timber.i("onCreateInputView() finish");
+    DiagnosticLogger.INSTANCE.event("Trime.onCreateInputView completed");
 
     return inputRootBinding.inputRoot;
   }
@@ -754,6 +767,10 @@ public class Trime extends LifecycleInputMethodService {
 
   @Override
   public void onStartInputView(EditorInfo attribute, boolean restarting) {
+    DiagnosticLogger.INSTANCE.event(
+        "Trime.onStartInputView entered; restarting=%s, editorPackage=%s",
+        restarting,
+        attribute.packageName);
     Timber.d("onStartInputView: restarting=%s", restarting);
     editorInfo = attribute;
     if (getPrefs().getThemeAndColor().getAutoDark()) {
